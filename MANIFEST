@@ -1,0 +1,6 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/MinimalFASTA.t
+lib/MinimalFASTA.pm
