@@ -40,7 +40,7 @@ use strict;
 use Carp;
 use Symbol 'qualify_to_ref';
 
-use 5.005000;
+use 5.008;
 our $VERSION = 0.01;
 
 require Exporter;
