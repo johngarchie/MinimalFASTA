@@ -19,17 +19,6 @@ MinimalFASTA - a minimal library for reading and printing FASTA data
 MinimalFASTA provides the functions &read_seq and &write_seq for reading and
 writing FASTA-formatted sequences to and from filehandles.
 
-=head1 ABOUT
-
-  Created by:	 John Archie <lt>jarchie@soe.ucsc.edu<gt>
-  Created on:    2011-08-12
-
-  SVN Information:
-    $LastChangedBy:: jarchie                                            $
-    $LastChangedDate:: 2011-08-13 12:40:57 -0700 (Sat, 13 Aug 2011)     $
-    $LastChangedRevision:: 106                                          $
-    $URL:: file:///svn/perlmod/MinimalFASTA/lib/MinimalFASTA.pm         $
-
 =cut
 
 package MinimalFASTA;
@@ -38,6 +27,7 @@ use warnings;
 use strict;
 
 use Carp;
+use IO::Handle;
 use Symbol 'qualify_to_ref';
 
 use 5.008;
@@ -49,6 +39,10 @@ our @ISA = qw/Exporter/;
 our @EXPORT_OK   = qw/FA_NAME FA_SEQ FA_DESC &read_seq &write_seq/;
 our %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 our @EXPORT      = qw//;    # export nothing by default
+
+sub read_seq(*);
+sub write_seq(*@);
+sub _new_seq(*);
 
 
 =head1 CONSTANTS
@@ -76,8 +70,6 @@ use constant {
 };
 
 
-my %line_cache; # for caching lines between subsequent &read_seq calls
-
 =item B<read_seq(*IN)>
 
 &read_seq attempts to fetch a sequence from *IN and return a three-element
@@ -91,38 +83,34 @@ array, but the third element is undefined.  When no more sequences remain,
 sub read_seq(*) {
     my $fh = qualify_to_ref shift, caller;
 
-    # scalar cache identifier to save lines across separate calls
-    my $fh_key = ( defined fileno $fh ? "fd=" . fileno $fh : scalar $fh );
-
-    # if the last line read from $fh is cached, retrieve it
-    # otherwise, read another line from this glob
-    my $line;
-    if ( exists $line_cache{$fh_key} ) {
-	$line = $line_cache{$fh_key};
-
-	if ( not defined $line ) {
-	    delete $line_cache{$fh_key};
-	    return ();
-	}
-    } else {
-	defined ( $line = <$fh> ) or croak "failed read from filehandle";
-    }
+    # read annotation line; return emty array if end-of-file
+    defined ( my $line = <$fh> ) or return ();
 
     # parse annotation
-    my ($name, $desc) = $line =~ /^>(\S*)(?:\s+(\S.*?))?\s*$/
-	or croak "sequence annotation on line $. could not be parsed";
+    my ($name, $desc) = $line =~ /^>(\S*)(?:\s+(\S.*?))?\s*$/o
+	or croak "no annotation on line $.";
 
     carp "annotation on line $. contains empty sequence name" if $name eq "";
 
-    # fetch sequence until next annotation or end-of-file
-    my $seq = "";
-    while(defined ( $line = <$fh> ) and $line !~ /^>/) {
-	$line =~ s/\s+//g;
+    # fetch sequence until encountering annotation or end-of-file
+    my ($seq, $more_sequence) = ("", 1);
+    while ( $more_sequence and defined ( $line = <$fh> ) ) {
+	my $next_char = $fh->getc;
+	
+	if ( not defined $next_char ) {	# end of file
+	    $more_sequence = 0;
+	}
+	elsif ( $next_char eq ">" ) {	# annotation of next sequence
+	    $more_sequence = 0;
+	    $fh->ungetc(ord $next_char);
+	}
+	else {				# more sequence, yay!
+	    $line .= $next_char;
+	}
+
+	$line =~ s/\s+//go;
 	$seq .= $line;
     }
-
-    # store next annotation (or end-of-file) for next call
-    $line_cache{$fh_key} = $line;
 
     return ($name, $seq, $desc);
 }
@@ -145,19 +133,25 @@ sub write_seq(*@) {
 
 =back
 
-=head1 BUGS
-
-In the FASTA format, &read_seq detects the end sequence lneeds to upon
-reading the annotation line of the next sequence or encountering the
-end-of-file.  This information is therefore cached across invocations
-of &read_seq and indexed by the file descriptor as returned by fileno.
-If no file descriptor exists (i.e., filehandles connected to in-memory
-objects and tied filehandles), &read_seq instead coerses the
-filehandle to a scalar value which must uniquely identify that file.
-
 =head1 SEE ALSO
 
 L<MinimalPDB>
+
+=head1 BUGS AND CAVEATS
+
+None known
+
+=head1 AUTHOR
+
+John Archie L<http://www.jarchie.com/>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2011 by John Archie
+
+This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself, either Perl version 5.8.0 or, at
+your option, any later version of Perl 5 you may have available.
 
 =cut
 
