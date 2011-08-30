@@ -16,8 +16,11 @@ MinimalFASTA - a minimal library for reading and printing FASTA data
 
 =head1 DESCRIPTION
 
-MinimalFASTA provides the functions &read_seq and &write_seq for reading and
-writing FASTA-formatted sequences to and from filehandles.
+MinimalFASTA provides the functions for formatting, parsing, reading and
+writing sequences in FASTA format.  Each sequence is represented as a
+three-element array containing the name, sequence, and description (in that
+order) of each sequence.  If no description exists, the third element exists
+but is undefined.
 
 =cut
 
@@ -36,20 +39,31 @@ our $VERSION = 0.01;
 require Exporter;
 our @ISA = qw/Exporter/;
 
-our @EXPORT_OK   = qw/FA_NAME FA_SEQ FA_DESC &read_seq &write_seq/;
+
+=head1 EXPORTS
+
+Nothing is exported by default.  For convenience, most users will want to
+export all constants and functions with the tag ":all", e.g.,
+
+  use MinimalFASTA ':all';
+
+=cut
+
+our @EXPORT_OK   = qw/FA_NAME FA_SEQ FA_DESC
+		      &read_seq &parse_seq &write_seq &format_seq/;
+
 our %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 our @EXPORT      = qw//;    # export nothing by default
 
 sub read_seq(*);
+sub parse_seq($);
 sub write_seq(*@);
-sub _new_seq(*);
+sub format_seq(@);
 
 
 =head1 CONSTANTS
 
-Each sequence is represented as an array containing the name, sequence, and
-description (in that order) of each FASTA sequence.  This module provides the
-following constants for use as sequence array indexes.
+This module provides the following constants for use as array indexes.
 
    Constant | Value | Description
   ----------|-------+------------------------
@@ -70,13 +84,47 @@ use constant {
 };
 
 
+=item B<format_seq($name, $seq, $desc)> or B<format_seq($name, $seq)>
+
+like &write_seq but returns the FASTA-formatted sequence instead.
+
+=cut
+
+sub format_seq(@) {
+    my ($name, $seq, $desc) = @_;
+    return ">$name" . (defined $desc ? " $desc\n" : "\n")
+           . join("\n", $seq =~ /(.{1,60})/go) . "\n";
+}
+
+
+=item B<parse_seq($fa_seq)> or B<parse_seq($fa_seq)>
+
+like &read_seq but uses the FASTA sequence stored in $fa_seq;
+
+=cut
+
+sub parse_seq($) {
+    my ($fa_seq) = @_;
+
+    my ($name, $desc, $seq )
+	= $fa_seq =~ /^>(\S*)(?:[ \t]+(\S.*?))?[ \t]*((?:\R[^>].*)*)$/o
+	    or croak "unable to parse FASTA sequence";
+
+    carp "annotation contains empty sequence name" if $name eq "";
+
+    $seq =~ s/\s//g;
+
+    return ($name, $seq, $desc);
+}
+
+
 =item B<read_seq(*IN)>
 
-&read_seq attempts to fetch a sequence from *IN and return a three-element
-array with the name, sequence, and description (in that order).  If the
-annotation contains no description, &read_seq still returns a three-element
-array, but the third element is undefined.  When no more sequences remain,
-&read_seq returns an empty array.
+&read_seq fetches a FASTA sequences from *IN and returns a three-element array
+with the name, sequence, and description (in that order).  If the annotation
+contains no description, &read_seq still returns a three-element array, but the
+third element is undefined.  If no more sequences remain, &read_seq returns an
+empty array.
 
 =cut
 
@@ -88,9 +136,9 @@ sub read_seq(*) {
 
     # parse annotation
     my ($name, $desc) = $line =~ /^>(\S*)(?:\s+(\S.*?))?\s*$/o
-	or croak "no annotation on line $.";
+	or croak "unable to parse annotation (line $.)";
 
-    carp "annotation on line $. contains empty sequence name" if $name eq "";
+    carp "annotation (line $.) contains empty sequence name" if $name eq "";
 
     # fetch sequence until encountering annotation or end-of-file
     my ($seq, $more_sequence) = ("", 1);
@@ -125,9 +173,8 @@ annotation line.
 =cut
 
 sub write_seq(*@) {
-    my ($fh, $name, $seq, $comment) = ( qualify_to_ref(shift, caller), @_ );
-    print $fh ">$name" . (defined $comment ? " $comment\n" : "\n");
-    print $fh join("\n", $seq =~ /(.{1,60})/go), "\n";
+    my $fh = qualify_to_ref(shift, caller);
+    print $fh format_seq @_;
 }
 
 

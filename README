@@ -1,13 +1,10 @@
-MinimalFASTA version 0.01
+MinimalFASTA version 0.02
 =========================
 
-This is the first release of the MinimalFASTA module.  The purpose of this
-module is to allow users to easily read and write FASTA sequences to and from
-file handles.
-
-This module provides a simple, dependency-free interface for handling FASTA
-sequences.  For a feature-rich solution, consider using the Bio::SeqIO and
-Bio::Seq modules in the BioPerl package.
+The purpose of the MinimalFASTA module is to allow users to easily manipulate
+FASTA sequences.  This module provides a simple, dependency-free interface for
+handling FASTA data.  For a feature-rich solution, consider using the
+Bio::SeqIO and Bio::Seq modules in the BioPerl package.
 
 
 INSTALLATION

@@ -1,6 +1,9 @@
 Revision history for Perl extension MinimalFASTA.
 
-0.01  Sat Aug 13 03:31:22 2011
+0.01  Sat Aug 13 03:31:22 PDT 2011
 	- original version; created by h2xs 1.23 with options
 		-b 5.8.0 -AX MinimalFASTA
 
+0.02  Tue Aug 30 15:54:45 PDT 2011
+	- added &parse_seq for parsing FASTA sequences stored in scalars
+	- added &format_seq for formatting and returning sequences.
